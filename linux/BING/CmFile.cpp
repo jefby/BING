@@ -211,6 +211,7 @@ int CmFile::GetNamesNE(CStr& nameWC, vecS &names, string &dir, string &ext)
 int CmFile::GetNamesNE(CStr& nameWC, vecS &names)
 {
 	int fNum = GetNames(nameWC, names);
+        printf("fNum is %d\n", fNum);
 	//string ext = GetExtention(nameWC);
 	for (int i = 0; i < fNum; i++)
 		names[i] = GetNameNE(names[i]);

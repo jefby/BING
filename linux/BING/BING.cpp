@@ -14,7 +14,7 @@ const char* COLORs[CN] = {"'k'", "'b'", "'g'", "'r'", "'c'", "'m'", "'y'",
 };
 
 
-#define THRESHOLD 0.5    // Define the value of intersection over union (IOU).
+#define THRESHOLD 0.25    // Define the value of intersection over union (IOU).
 //#define TRAIN_SET      // Uncomment this line to detect object boxes on train set.
 //#define PRELOAD_IMGS   // Uncomment this line to remove counting times of image reading. Warning: much more memory is required
 
@@ -73,7 +73,8 @@ int Objectness::loadTrainedModel(string modelName) // Return -1, 0, or 1 if part
 	//_tigF.reconstruct(filters1f);
 
 	_svmSzIdxs = idx1i;
-	CV_Assert(_svmSzIdxs.size() > 1 && filters1f.size() == Size(_W, _W) && filters1f.type() == CV_32F);
+	std::cout << "svmSzIdex.size() " << _svmSzIdxs.size() << " filters1f.size() " << filters1f.size() << " filters1f.type() " << filters1f.type() << std::endl; 
+	CV_Assert(_svmSzIdxs.size() >= 1 && filters1f.size() == Size(_W, _W) && filters1f.type() == CV_32F);
 	_svmFilter = filters1f;
 
 	if (!matRead(s2, _svmReW1f) || _svmReW1f.size() != Size(2, _svmSzIdxs.size())){
@@ -339,21 +340,26 @@ void Objectness::generateTrianData()
 		xP.reserve(NUM_GT_BOX*4), szP.reserve(NUM_GT_BOX*4), xN.reserve(NUM_NEG_BOX);
 		Mat im3u = imread(format(_S(_voc.imgPathW), _S(_voc.trainSet[i])));
 
+                std::cout << "NUM_GT_BOX " << NUM_GT_BOX << " im3u.empty : " << im3u.empty() << std::endl;
+
 		// Get positive training data
 		for (int k = 0; k < NUM_GT_BOX; k++){
 			const Vec4i& bbgt =  _voc.gtTrainBoxes[i][k];
 			vector<Vec4i> bbs; // bounding boxes;
 			vecI bbR; // Bounding box ratios
 			int nS = gtBndBoxSampling(bbgt, bbs, bbR);
+			std::cout << "bbgt " << bbgt<< " nS is " << nS << std::endl;
 			for (int j = 0; j < nS; j++){
 				bbs[j][2] = min(bbs[j][2], im3u.cols);
 				bbs[j][3] = min(bbs[j][3], im3u.rows);
 				Mat mag1f = getFeature(im3u, bbs[j]), magF1f;
-				flip(mag1f, magF1f, CV_FLIP_HORIZONTAL);
-				xP.push_back(mag1f);
-				xP.push_back(magF1f);
-				szP.push_back(bbR[j]);
-				szP.push_back(bbR[j]);
+				if(!mag1f.empty()) {
+					flip(mag1f, magF1f, CV_FLIP_HORIZONTAL);
+					xP.push_back(mag1f);
+					xP.push_back(magF1f);
+					szP.push_back(bbR[j]);
+					szP.push_back(bbR[j]);
+				}
 			}			
 		}
 		
@@ -367,6 +373,8 @@ void Objectness::generateTrianData()
 		}
 	}
 	
+        std::cout << "--- 1" << std::endl;
+
 	const int NUM_R = _numT * _numT + 1;
 	vecI szCount(NUM_R); // Object counts of each size (combination of scale and aspect ratio) 
 	int numP = 0, numN = 0, iP = 0, iN = 0;
@@ -384,6 +392,8 @@ void Objectness::generateTrianData()
 	}
 	matWrite(_modelName + ".idx", Mat(szActive));
 
+        std::cout << "--- 2" << std::endl;
+
 	Mat xP1f(numP, FILTER_SZ, CV_32F), xN1f(numN, FILTER_SZ, CV_32F);
 	for (int i = 0; i < NUM_TRAIN; i++)	{
 		vector<Mat> &xP = xTrainP[i], &xN = xTrainN[i];
@@ -392,17 +402,24 @@ void Objectness::generateTrianData()
 		for (size_t j = 0; j < xN.size(); j++)
 			memcpy(xN1f.ptr(iN++), xN[j].data, FILTER_SZ*sizeof(float));
 	}
+        std::cout << "--- 3" << std::endl;
 	CV_Assert(numP == iP && numN == iN);
 	matWrite(_modelName + ".xP", xP1f);
 	matWrite(_modelName + ".xN", xN1f);
+        std::cout << "--- 4" << std::endl;
 }
 
 Mat Objectness::getFeature(CMat &img3u, const Vec4i &bb)
 {
 	int x = bb[0] - 1, y = bb[1] - 1;
+	
 	Rect reg(x, y, bb[2] -  x, bb[3] - y);
 	Mat subImg3u, mag1f, mag1u;
+
+        if (x < 0 || y < 0 || bb[2] - x < 0 || bb[3] - y < 0)
+		return mag1f;
 	resize(img3u(reg), subImg3u, Size(_W, _W));
+//	std::cout << "im3u size " << img3u.size() << "reg is "<< reg << std::endl;
 	gradientMag(subImg3u, mag1u);
 	mag1u.convertTo(mag1f, CV_32F);
 	return mag1f;
@@ -414,6 +431,7 @@ int Objectness::gtBndBoxSampling(const Vec4i &bbgt, vector<Vec4i> &samples, vecI
 	wVal = log(wVal)/_logBase, hVal = log(hVal)/_logBase;
 	int wMin = max((int)(wVal - 0.5), _minT), wMax = min((int)(wVal + 1.5), _maxT);
 	int hMin = max((int)(hVal - 0.5), _minT), hMax = min((int)(hVal + 1.5), _maxT);
+	std::cout << "wVal " << wVal << " hVal " << hVal << " wMin " << wMin << " hMin " << hMin << std::endl;
 	for (int h = hMin; h <= hMax; h++) for (int w = wMin; w <= wMax; w++){
 		int wT = tLen(w) - 1, hT = tLen(h) - 1;
 		Vec4i bb(bbgt[0], bbgt[1], bbgt[0] + wT, bbgt[1] + hT);
@@ -438,6 +456,8 @@ int Objectness::gtBndBoxSampling(const Vec4i &bbgt, vector<Vec4i> &samples, vecI
 			//	samples.push_back(bb);
 			//	bbR.push_back(sz2idx(w, h));
 			//}
+		}else{
+		     std::cout << DataSetVOC::interUnio(bb, bbgt) << " <= THRESHOLD" << std::endl;
 		}
 	}
 	return samples.size();

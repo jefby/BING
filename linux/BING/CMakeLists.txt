@@ -8,7 +8,7 @@ set(LIB_DIRS ${BING_BINARY_DIR}/LibLinear)
 link_directories(${LIB_DIRS})
 
 if (${CMAKE_COMPILER_IS_GNUCXX})
-  set(OPENMP_FLAG "-fopenmp -std=c++11")
+  set(OPENMP_FLAG "-fopenmp -std=c++11 -msse4.2")
 endif (${CMAKE_COMPILER_IS_GNUCXX})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPENMP_FLAG} -O3")

@@ -27,6 +27,9 @@ void RunObjectness(CStr &resName, double base, int W, int NSS, int numPerSz, CSt
 {
 	srand(131);
 	DataSetVOC voc2007(dataPath); 
+        cout << "datapath: " << dataPath << endl<< "annotations " << dataPath + "Annotations/" << endl;
+	voc2007.cvt2OpenCVYml(dataPath + "/Annotations/");
+//	voc2007.cvt2OpenCVYml("/media/jefby/BING/datasets/BOOK20181008/Annotations/");
 	voc2007.loadAnnotations();
 
 	cout << "Dataset:'" << _S(voc2007.wkDir) << "' with " << voc2007.trainNum << " training and " << voc2007.testNum << " testing" << endl;
@@ -39,6 +42,6 @@ void RunObjectness(CStr &resName, double base, int W, int NSS, int numPerSz, CSt
 	objNess.getObjBndBoxesForTestFast(boxes, numPerSz);
 	//objNess.getRandomBoxes(boxes);
 	//objNess.evaluatePerClassRecall(boxes, resName, 2000);
-	//objNess.illuTestReults(boxes);
+	objNess.illuTestReults(boxes);
 }
 

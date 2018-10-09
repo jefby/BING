@@ -1,5 +1,8 @@
 #include "stdafx.h"
 #include "DataSetVOC.h"
+#include <opencv2/opencv.hpp>
+#include <vector>
+#include <string>
 
 
 DataSetVOC::DataSetVOC(CStr &_wkDir)
@@ -11,14 +14,14 @@ DataSetVOC::DataSetVOC(CStr &_wkDir)
 	annoPathW = wkDir + "Annotations/%s.yml";
 	CmFile::MkDir(resDir);
 	CmFile::MkDir(localDir);
-
+       
 	trainSet = CmFile::loadStrList(wkDir + "ImageSets/Main/train.txt");
 	testSet = CmFile::loadStrList(wkDir + "ImageSets/Main/test.txt");
 	classNames = CmFile::loadStrList(wkDir + "ImageSets/Main/class.txt");
 
 	// testSet.insert(testSet.end(), trainSet.begin(), trainSet.end());	
 	// testSet.resize(min(1000, (int)testSet.size()));
-
+        
 	trainNum = trainSet.size();
 	testNum = testSet.size();
 }
@@ -123,6 +126,7 @@ void DataSetVOC::loadBox(const FileNode &fn, vector<Vec4i> &boxes, vecI &clsIdx)
 	fn["name"]>>clsName;
 
 	clsIdx.push_back(findFromList(clsName, classNames));
+        std::cout << "className is " << clsName << " [xmin,ymin,xmax,ymax]=[" << strXmin << "," << strYmin << "," << strXmax <<"," << strYmax << "]" << std::endl;
 	CV_Assert_(clsIdx[clsIdx.size() - 1] >= 0, ("Invalidate class name\n"));
 }
 
@@ -147,14 +151,29 @@ bool DataSetVOC::loadBBoxes(CStr &nameNE, vector<Vec4i> &boxes, vecI &clsIdx)
 // Needs to call yml.m in this solution before running this function.
 bool DataSetVOC::cvt2OpenCVYml(CStr &annoDir)
 {
+/*
 	vecS namesNE;
 	int imgNum = CmFile::GetNamesNE(annoDir + "*.yaml", namesNE);
-	printf("Converting annotations to OpenCV yml format:\n");
+	printf("Converting annotations to OpenCV yml format: %d\n", imgNum);
 	for (int i = 0; i < imgNum; i++){
 		printf("%d/%d %s.yaml\r", i, imgNum, _S(namesNE[i]));	
 		string fPath = annoDir + namesNE[i];
 		cvt2OpenCVYml(fPath + ".yaml", fPath + ".yml");
 	}
+*/
+
+	std::vector<cv::String> namesNE;
+	cv::glob(annoDir + "/*.yaml", namesNE, false);
+	int imgNum = namesNE.size();
+	printf("Converting annotations to OpenCV yml format: %d\n", imgNum);
+	for (int i = 0; i < imgNum; i++){
+		int length = namesNE[i].length();
+		string fPath = namesNE[i].substr(0, length - 5);
+		printf("%d/%d %s:%s\n", i, imgNum, _S(namesNE[i]), _S(fPath));	
+	        	
+		cvt2OpenCVYml(fPath + ".yaml", fPath + ".yml");
+	}
+        
 	return true;
 }
 
