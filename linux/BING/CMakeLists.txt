@@ -1,4 +1,5 @@
 #
+SET(OpenCV_DIR /Users/jefby/Library/opencv_install/share/OpenCV)
 find_package(OpenCV REQUIRED)
 
 #OPENCV_DIR should be set as an environment variable in the shell if it is not

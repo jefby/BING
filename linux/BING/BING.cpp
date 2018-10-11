@@ -14,10 +14,10 @@ const char* COLORs[CN] = {"'k'", "'b'", "'g'", "'r'", "'c'", "'m'", "'y'",
 };
 
 
-#define THRESHOLD 0.25    // Define the value of intersection over union (IOU).
+#define THRESHOLD 0.45    // Define the value of intersection over union (IOU).
 //#define TRAIN_SET      // Uncomment this line to detect object boxes on train set.
 //#define PRELOAD_IMGS   // Uncomment this line to remove counting times of image reading. Warning: much more memory is required
-
+//#define PRETRAINED_MODEL 1 // Uncomment this line to train model from source image
 
 void backtrace()
 {
@@ -365,11 +365,13 @@ void Objectness::generateTrianData()
 		
 		// Get negative training data
 		for (int k = 0; k < NUM_NEG_BOX; k++){
-			int x1 = rand() % im3u.cols + 1, x2 = rand() % im3u.cols + 1;
-			int y1 = rand() % im3u.rows + 1, y2 = rand() % im3u.rows + 1;
-			Vec4i bb(min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2));
-			if (maxIntUnion(bb, _voc.gtTrainBoxes[i]) < THRESHOLD)
-				xN.push_back(getFeature(im3u, bb));
+            if (im3u.cols > 0 && im3u.rows > 0 ) {
+                int x1 = rand() % im3u.cols + 1, x2 = rand() % im3u.cols + 1;
+                int y1 = rand() % im3u.rows + 1, y2 = rand() % im3u.rows + 1;
+                Vec4i bb(min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2));
+                if (maxIntUnion(bb, _voc.gtTrainBoxes[i]) < THRESHOLD)
+                    xN.push_back(getFeature(im3u, bb));
+            }
 		}
 	}
 	
@@ -392,7 +394,7 @@ void Objectness::generateTrianData()
 	}
 	matWrite(_modelName + ".idx", Mat(szActive));
 
-        std::cout << "--- 2" << std::endl;
+    std::cout << "--- 2" << std::endl;
 
 	Mat xP1f(numP, FILTER_SZ, CV_32F), xN1f(numN, FILTER_SZ, CV_32F);
 	for (int i = 0; i < NUM_TRAIN; i++)	{
@@ -402,11 +404,11 @@ void Objectness::generateTrianData()
 		for (size_t j = 0; j < xN.size(); j++)
 			memcpy(xN1f.ptr(iN++), xN[j].data, FILTER_SZ*sizeof(float));
 	}
-        std::cout << "--- 3" << std::endl;
+    std::cout << "--- 3" << std::endl;
 	CV_Assert(numP == iP && numN == iN);
 	matWrite(_modelName + ".xP", xP1f);
 	matWrite(_modelName + ".xN", xN1f);
-        std::cout << "--- 4" << std::endl;
+    std::cout << "--- 4" << std::endl;
 }
 
 Mat Objectness::getFeature(CMat &img3u, const Vec4i &bb)
@@ -693,9 +695,14 @@ void Objectness::getObjBndBoxesForTests(vector<vector<Vec4i> > &_boxes, int numD
 // Get potential bounding boxes for all test images
 void Objectness::getObjBndBoxesForTestFast(vector<vector<Vec4i> > &_boxes, int numDetPerSize)
 {
-	//setColorSpace(HSV);
-	trainObjectness(numDetPerSize);
-	loadTrainedModel();
+#ifdef PRETRAINED_MODEL
+    setColorSpace(MAXBGR);
+#else
+    //setColorSpace(HSV);
+    trainObjectness(numDetPerSize);
+#endif
+	
+    loadTrainedModel();
 
 #ifdef TRAIN_SET
 	const int Num = _voc.trainSet.size();
@@ -775,12 +782,15 @@ void Objectness::getRandomBoxes(vector<vector<Vec4i> > &boxesTests, int num)
 	for (int i = 0; i < TestNum; i++){
 		Mat imgs3u = imread(format(_S(_voc.imgPathW), _S(_voc.testSet[i])));
 		int H = imgs3u.cols, W = imgs3u.rows;
-		boxesTests[i].reserve(num);
-		for (int k = 0; k < num; k++){
-			int x1 = rand()%W + 1, x2 = rand()%W + 1;
-			int y1 = rand()%H + 1, y2 = rand()%H + 1;
-			boxesTests[i].push_back(Vec4i(min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)));
-		}
+        if (H > 0 && W > 0) {
+            boxesTests[i].reserve(num);
+            for (int k = 0; k < num; k++){
+                int x1 = rand()%W + 1, x2 = rand()%W + 1;
+                int y1 = rand()%H + 1, y2 = rand()%H + 1;
+                boxesTests[i].push_back(Vec4i(min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)));
+            }
+        }
+		
 	}
 	evaluatePerImgRecall(boxesTests, "PerImgAll.m", num);
 }
@@ -853,6 +863,8 @@ void Objectness::illuTestReults(const vector<vector<Vec4i> > &boxesTests)
 	CStr resDir = _voc.localDir + "ResIlu/";
 	CmFile::MkDir(resDir);
 	const int TEST_NUM = _voc.testSet.size();
+    
+    namedWindow("illuTest");// Create a window for display.
 #pragma omp parallel for
 	for (int i = 0; i < TEST_NUM; i++){
 		const vector<Vec4i> &boxesGT = _voc.gtTestBoxes[i];
@@ -884,6 +896,16 @@ void Objectness::illuTestReults(const vector<vector<Vec4i> > &boxesTests)
 		}
 
 		imwrite(resDir + resNameNE + "_Match.jpg", img);
+        
+        // 显示结果
+        
+        if (!img.empty()) {
+            cv::Mat imgResize = img;
+            cv::resize(img, imgResize, Size(640, 480));
+            imshow("illuTest", img);
+            waitKey(10);
+        }
+       
 	}
 }
 

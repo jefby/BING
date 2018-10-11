@@ -114,7 +114,6 @@ void DataSetVOC::loadBox(const FileNode &fn, vector<Vec4i> &boxes, vecI &clsIdx)
 	fn["difficult"]>>isDifficult;
 	if (isDifficult == "1")
 		return; 
-
 	string strXmin, strYmin, strXmax, strYmax;
 	fn["bndbox"]["xmin"] >> strXmin;
 	fn["bndbox"]["ymin"] >> strYmin;
@@ -124,10 +123,11 @@ void DataSetVOC::loadBox(const FileNode &fn, vector<Vec4i> &boxes, vecI &clsIdx)
 
 	string clsName;
 	fn["name"]>>clsName;
-
-	clsIdx.push_back(findFromList(clsName, classNames));
+    if (!clsName.empty() && !strXmin.empty() && !strXmax.empty() && !strYmin.empty() && !strYmax.empty()) {
+        clsIdx.push_back(findFromList(clsName, classNames));
         std::cout << "className is " << clsName << " [xmin,ymin,xmax,ymax]=[" << strXmin << "," << strYmin << "," << strXmax <<"," << strYmax << "]" << std::endl;
-	CV_Assert_(clsIdx[clsIdx.size() - 1] >= 0, ("Invalidate class name\n"));
+        CV_Assert_(clsIdx[clsIdx.size() - 1] >= 0, ("Invalidate class name\n"));
+    }
 }
 
 bool DataSetVOC::loadBBoxes(CStr &nameNE, vector<Vec4i> &boxes, vecI &clsIdx)
